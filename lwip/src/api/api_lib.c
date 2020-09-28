@@ -56,7 +56,7 @@
    the application */
 
 #include "lwip/opt.h"
-
+#include "lwipopts.h"
 #if LWIP_NETCONN /* don't build if not configured for use in lwipopts.h */
 
 #include "lwip/api.h"
@@ -374,7 +374,7 @@ netconn_bind_if(struct netconn *conn, u8_t if_idx)
  * @return ERR_OK if connected, return value of tcp_/udp_/raw_connect otherwise
  */
 err_t
-netconn_connect(struct netconn *conn, const ip_addr_t *addr, u16_t port)
+netconn_connect(struct netconn *conn, ip_addr_t *addr, u16_t port)
 {
   API_MSG_VAR_DECLARE(msg);
   err_t err;

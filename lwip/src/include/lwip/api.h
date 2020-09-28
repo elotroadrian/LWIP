@@ -38,7 +38,7 @@
 #define LWIP_HDR_API_H
 
 #include "lwip/opt.h"
-
+#include "lwipopts.h"
 #if LWIP_NETCONN || LWIP_SOCKET /* don't build if not configured for use in lwipopts.h */
 /* Note: Netconn API is always available when sockets are enabled -
  * sockets are implemented on top of them */
@@ -194,6 +194,8 @@ enum netconn_igmp {
 };
 #endif /* LWIP_IGMP || (LWIP_IPV6 && LWIP_IPV6_MLD) */
 
+#define LWIP_DNS 1
+
 #if LWIP_DNS
 /* Used for netconn_gethostbyname_addrtype(), these should match the DNS_ADDRTYPE defines in dns.h */
 #define NETCONN_DNS_DEFAULT   NETCONN_DNS_IPV4_IPV6
@@ -325,7 +327,7 @@ err_t   netconn_getaddr(struct netconn *conn, ip_addr_t *addr,
 
 err_t   netconn_bind(struct netconn *conn, const ip_addr_t *addr, u16_t port);
 err_t   netconn_bind_if(struct netconn *conn, u8_t if_idx);
-err_t   netconn_connect(struct netconn *conn, const ip_addr_t *addr, u16_t port);
+err_t   netconn_connect(struct netconn *conn, ip_addr_t *addr, u16_t port);
 err_t   netconn_disconnect (struct netconn *conn);
 err_t   netconn_listen_with_backlog(struct netconn *conn, u8_t backlog);
 /** @ingroup netconn_tcp */
@@ -356,6 +358,7 @@ err_t   netconn_join_leave_group(struct netconn *conn, const ip_addr_t *multiadd
 err_t   netconn_join_leave_group_netif(struct netconn *conn, const ip_addr_t *multiaddr,
                              u8_t if_idx, enum netconn_igmp join_or_leave);
 #endif /* LWIP_IGMP || (LWIP_IPV6 && LWIP_IPV6_MLD) */
+
 #if LWIP_DNS
 #if LWIP_IPV4 && LWIP_IPV6
 err_t   netconn_gethostbyname_addrtype(const char *name, ip_addr_t *addr, u8_t dns_addrtype);

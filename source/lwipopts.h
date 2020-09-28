@@ -4,7 +4,7 @@
  * This file is based on \src\include\lwip\opt.h
  ******************************************************************************
  * Copyright (c) 2013-2016, Freescale Semiconductor, Inc.
- * Copyright 2016-2018 NXP
+ * Copyright 2016-2019 NXP
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -185,12 +185,26 @@ void sys_mark_tcpip_thread(void);
 #define LWIP_ICMP 1
 #endif
 
+/* ---------- RAW options ---------- */
+#if !defined LWIP_RAW
+#define LWIP_RAW 1
+#endif
+
 /* ---------- DHCP options ---------- */
 /* Define LWIP_DHCP to 1 if you want DHCP configuration of
    interfaces. DHCP is not implemented in lwIP 0.5.1, however, so
    turning this on does currently not work. */
 #ifndef LWIP_DHCP
 #define LWIP_DHCP 1
+#endif
+
+/* ---------- DNS options ----------- */
+/**
+ * LWIP_DNS==1: Turn on DNS module. UDP must be available for DNS
+ * transport.
+ */
+#if !defined LWIP_DNS || defined __DOXYGEN__
+#define LWIP_DNS 1
 #endif
 
 /* ---------- UDP options ---------- */
@@ -256,7 +270,7 @@ Some MCU allow computing and verifying the IP, UDP, TCP and ICMP checksums by ha
  * sys_thread_new() when the thread is created.
  */
 #ifndef DEFAULT_THREAD_STACKSIZE
-#define DEFAULT_THREAD_STACKSIZE 1500
+#define DEFAULT_THREAD_STACKSIZE 3000
 #endif
 
 /**

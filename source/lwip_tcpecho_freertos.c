@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (c) 2016, Freescale Semiconductor, Inc.
  * Copyright 2016-2020 NXP
  * All rights reserved.
@@ -17,9 +17,11 @@
 #include "tcpecho.h"
 #include "lwip/netifapi.h"
 #include "lwip/tcpip.h"
+#include "lwip/sys.h"
+#include "lwip/api.h"
 #include "netif/ethernet.h"
 #include "enet_ethernetif.h"
-
+#include "lwip/prot/dhcp.h"
 #include "board.h"
 #include "fsl_phy.h"
 
@@ -31,7 +33,7 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
-
+#if 0
 /* IP address configuration. */
 #define configIP_ADDR0 192
 #define configIP_ADDR1 168
@@ -50,10 +52,14 @@
 #define configGW_ADDR2 0
 #define configGW_ADDR3 100
 
+#endif
+
+#define ITESO_URL "iteso.mx"
+
 /* MAC address configuration. */
 #define configMAC_ADDR                     \
     {                                      \
-        0x02, 0x12, 0x13, 0x10, 0x15, 0x11 \
+        0x02, 0x12, 0x13, 0x10, 0x15, 0x15 \
     }
 
 /* Address of PHY interface. */
@@ -73,6 +79,12 @@
 #define EXAMPLE_NETIF_INIT_FN ethernetif0_init
 #endif /* EXAMPLE_NETIF_INIT_FN */
 
+/*! @brief Stack size of the thread which prints DHCP info. */
+#define PRINT_THREAD_STACKSIZE 512
+
+/*! @brief Priority of the thread which prints DHCP info. */
+#define PRINT_THREAD_PRIO DEFAULT_THREAD_PRIO
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -83,10 +95,111 @@
 
 static mdio_handle_t mdioHandle = {.ops = &EXAMPLE_MDIO_OPS};
 static phy_handle_t phyHandle   = {.phyAddr = EXAMPLE_PHY_ADDRESS, .mdioHandle = &mdioHandle, .ops = &EXAMPLE_PHY_OPS};
+static ip_addr_t iteso_addr;
+
 
 /*******************************************************************************
  * Code
  ******************************************************************************/
+/*!
+ * @brief Prints DHCP status of the interface when it has changed from last status.
+ *
+ * @param arg pointer to network interface structure
+ */
+static void print_dhcp_state(void *arg)
+{
+    struct netif *netif = (struct netif *)arg;
+    struct dhcp *dhcp;
+    u8_t dhcp_last_state = DHCP_STATE_OFF;
+    err_t err;
+
+    while (netif_is_up(netif))
+    {
+        dhcp = netif_dhcp_data(netif);
+
+        if (dhcp == NULL)
+        {
+            dhcp_last_state = DHCP_STATE_OFF;
+        }
+        else if (dhcp_last_state != dhcp->state)
+        {
+            dhcp_last_state = dhcp->state;
+
+            PRINTF(" DHCP state       : ");
+            switch (dhcp_last_state)
+            {
+                case DHCP_STATE_OFF:
+                    PRINTF("OFF");
+                    break;
+                case DHCP_STATE_REQUESTING:
+                    PRINTF("REQUESTING");
+                    break;
+                case DHCP_STATE_INIT:
+                    PRINTF("INIT");
+                    break;
+                case DHCP_STATE_REBOOTING:
+                    PRINTF("REBOOTING");
+                    break;
+                case DHCP_STATE_REBINDING:
+                    PRINTF("REBINDING");
+                    break;
+                case DHCP_STATE_RENEWING:
+                    PRINTF("RENEWING");
+                    break;
+                case DHCP_STATE_SELECTING:
+                    PRINTF("SELECTING");
+                    break;
+                case DHCP_STATE_INFORMING:
+                    PRINTF("INFORMING");
+                    break;
+                case DHCP_STATE_CHECKING:
+                    PRINTF("CHECKING");
+                    break;
+                case DHCP_STATE_BOUND:
+                    PRINTF("BOUND");
+                    break;
+                case DHCP_STATE_BACKING_OFF:
+                    PRINTF("BACKING_OFF");
+                    break;
+                default:
+                    PRINTF("%u", dhcp_last_state);
+                    assert(0);
+                    break;
+            }
+            PRINTF("\r\n");
+
+            if (dhcp_last_state == DHCP_STATE_BOUND)
+            {
+                PRINTF("\r\n IPv4 Address     : %s\r\n", ipaddr_ntoa(&netif->ip_addr));
+                PRINTF(" IPv4 Subnet mask : %s\r\n", ipaddr_ntoa(&netif->netmask));
+                PRINTF(" IPv4 Gateway     : %s\r\n\r\n", ipaddr_ntoa(&netif->gw));
+
+                PRINTF("Servidor DNS: \"%s\"...\r\n", ipaddr_ntoa(dns_getserver(0)));
+
+                PRINTF("Resolving \"%s\"...\r\n", ITESO_URL);
+
+                err = netconn_gethostbyname(ITESO_URL, &iteso_addr);
+
+                if(err == ERR_OK)
+                {
+                	PRINTF("Dirección IP: %s \r\n",ipaddr_ntoa(&iteso_addr));
+                }
+                else
+                {
+                	PRINTF("Error al resolver: %d\n", err);
+                }
+
+                tcpecho_init();
+
+            }
+        }
+
+        sys_msleep(20U);
+    }
+
+    vTaskDelete(NULL);
+}
+
 
 /*!
  * @brief Main function
@@ -115,9 +228,9 @@ int main(void)
 
     mdioHandle.resource.csrClock_Hz = EXAMPLE_CLOCK_FREQ;
 
-    IP4_ADDR(&netif_ipaddr, configIP_ADDR0, configIP_ADDR1, configIP_ADDR2, configIP_ADDR3);
-    IP4_ADDR(&netif_netmask, configNET_MASK0, configNET_MASK1, configNET_MASK2, configNET_MASK3);
-    IP4_ADDR(&netif_gw, configGW_ADDR0, configGW_ADDR1, configGW_ADDR2, configGW_ADDR3);
+    IP4_ADDR(&netif_ipaddr, 0U, 0U, 0U, 0U);
+	IP4_ADDR(&netif_netmask, 0U, 0U, 0U, 0U);
+	IP4_ADDR(&netif_gw, 0U, 0U, 0U, 0U);
 
     tcpip_init(NULL, NULL);
 
@@ -126,18 +239,16 @@ int main(void)
     netifapi_netif_set_default(&netif);
     netifapi_netif_set_up(&netif);
 
+    netifapi_dhcp_start(&netif);
+
     PRINTF("\r\n************************************************\r\n");
-    PRINTF(" TCP Echo example\r\n");
-    PRINTF("************************************************\r\n");
-    PRINTF(" IPv4 Address     : %u.%u.%u.%u\r\n", ((u8_t *)&netif_ipaddr)[0], ((u8_t *)&netif_ipaddr)[1],
-           ((u8_t *)&netif_ipaddr)[2], ((u8_t *)&netif_ipaddr)[3]);
-    PRINTF(" IPv4 Subnet mask : %u.%u.%u.%u\r\n", ((u8_t *)&netif_netmask)[0], ((u8_t *)&netif_netmask)[1],
-           ((u8_t *)&netif_netmask)[2], ((u8_t *)&netif_netmask)[3]);
-    PRINTF(" IPv4 Gateway     : %u.%u.%u.%u\r\n", ((u8_t *)&netif_gw)[0], ((u8_t *)&netif_gw)[1],
-           ((u8_t *)&netif_gw)[2], ((u8_t *)&netif_gw)[3]);
+    PRINTF(" TCP Echo Client with DHCP\r\n");
     PRINTF("************************************************\r\n");
 
-    tcpecho_init();
+    if (sys_thread_new("print_dhcp", print_dhcp_state, &netif, PRINT_THREAD_STACKSIZE, PRINT_THREAD_PRIO) == NULL)
+	{
+		LWIP_ASSERT("stack_init(): Task creation failed.", 0);
+	}
 
     vTaskStartScheduler();
 
