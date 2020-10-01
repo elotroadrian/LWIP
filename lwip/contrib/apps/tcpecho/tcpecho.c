@@ -37,117 +37,83 @@
 
 #include "lwip/sys.h"
 #include "lwip/api.h"
+
+#define PORT	7
+
+#define configIP_ADDR0_Serv 192
+#define configIP_ADDR1_Serv 168
+#define configIP_ADDR2_Serv 100
+#define configIP_ADDR3_Serv 58
+
 /*-----------------------------------------------------------------------------------*/
 static void
 tcpecho_thread(void *arg)
 {
-  struct netconn *conn, *newconn;
-  err_t err;
-  LWIP_UNUSED_ARG(arg);
+	struct netconn *conn, *newconn;
+	err_t err;
+	LWIP_UNUSED_ARG(arg);
+	ip4_addr_t netif_ipaddr_Server;
 
-  /* Create a new connection identifier. */
-  /* Bind connection to well known port number 7. */
-#if LWIP_IPV6
-  conn = netconn_new(NETCONN_TCP_IPV6);
-  netconn_bind(conn, IP6_ADDR_ANY, 7);
-#else /* LWIP_IPV6 */
-  conn = netconn_new(NETCONN_TCP);
-  netconn_bind(conn, IP_ADDR_ANY, 7);
-#endif /* LWIP_IPV6 */
-  LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
+	/* Create a new connection identifier. */
+	/* Bind connection to well known port number 7. */
+	conn = netconn_new(NETCONN_TCP);
+	//netconn_bind(conn, IP_ADDR_ANY, 7);
 
-  /* Tell connection to go into listening mode. */
-  netconn_listen(conn);
+	LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
 
-  while (1) {
+	/* Tell connection to go into listening mode. */
+	//netconn_listen(conn);
+	IP4_ADDR(&netif_ipaddr_Server, configIP_ADDR0_Serv, configIP_ADDR1_Serv, configIP_ADDR2_Serv, configIP_ADDR3_Serv);
 
-    /* Grab new connection. */
-    err = netconn_accept(conn, &newconn);
-    /*printf("accepted new connection %p\n", newconn);*/
-    /* Process the new connection. */
-    if (err == ERR_OK) {
-      struct netbuf *buf;
-      void *data;
-      u16_t len;
+	struct netbuf *buf;
+	void *data;
+	u16_t len;
 
-      while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
-        /*printf("Recved\n");*/
-        do {
-             netbuf_data(buf, &data, &len);
-             err = netconn_write(newconn, data, len, NETCONN_COPY);
-#if 0
-            if (err != ERR_OK) {
-              printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
-            }
-#endif
-        } while (netbuf_next(buf) >= 0);
-        netbuf_delete(buf);
-      }
-      /*printf("Got EOF, looping\n");*/
-      /* Close connection and discard connection identifier. */
-      netconn_close(newconn);
-      netconn_delete(newconn);
-    }
-  }
-}
+	u8_t myData[] = {"Hello World!"};
 
-tcpecho_thread1(void *arg)
-{
-  struct netconn *conn, *newconn;
-  err_t err;
-  LWIP_UNUSED_ARG(arg);
+	data = (void*)myData;
+	len = strlen(myData) + 1;
 
-  /* Create a new connection identifier. */
-  /* Bind connection to well known port number 7. */
-#if LWIP_IPV6
-  conn = netconn_new(NETCONN_TCP_IPV6);
-  netconn_bind(conn, IP6_ADDR_ANY, 10000);
-#else /* LWIP_IPV6 */
-  conn = netconn_new(NETCONN_TCP);
-  netconn_bind(conn, IP_ADDR_ANY, 10000);
-#endif /* LWIP_IPV6 */
-  LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
+	while (1)
+	{
+		conn = netconn_new(NETCONN_TCP);
+		err = netconn_connect(conn, &netif_ipaddr_Server, PORT);
 
-  /* Tell connection to go into listening mode. */
-  netconn_listen(conn);
+		if(err == ERR_OK)
+		{
+			printf("Conectado \n");
 
-  while (1) {
+			printf("Enviando datos. Longitud: %d caracteres\n", len-1);
 
-    /* Grab new connection. */
-    err = netconn_accept(conn, &newconn);
-    /*printf("accepted new connection %p\n", newconn);*/
-    /* Process the new connection. */
-    if (err == ERR_OK) {
-      struct netbuf *buf;
-      void *data;
-      u16_t len;
+			err = netconn_write(conn, data, len, NETCONN_COPY);
+			printf("Enviado \"%s\"\n", myData);
 
-      while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
-        /*printf("Recved\n");*/
-        do {
-             netbuf_data(buf, &data, &len);
-             err = netconn_write(newconn, data, len, NETCONN_COPY);
-#if 0
-            if (err != ERR_OK) {
-              printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
-            }
-#endif
-        } while (netbuf_next(buf) >= 0);
-        netbuf_delete(buf);
-      }
-      /*printf("Got EOF, looping\n");*/
-      /* Close connection and discard connection identifier. */
-      netconn_close(newconn);
-      netconn_delete(newconn);
-    }
-  }
+			err = netconn_recv(conn, &buf);
+			netbuf_data(buf, &data, &len);
+			printf("Recibido \"%s\"\n", data);
+
+
+			netconn_close(conn);
+			netconn_delete(conn);
+
+			vTaskDelay(20000);
+		}
+		else
+		{
+			printf("Error al conectar: %d\n", err);
+
+			break;
+		}
+
+
+
+	}
 }
 /*-----------------------------------------------------------------------------------*/
 void
 tcpecho_init(void)
 {
   sys_thread_new("tcpecho_thread", tcpecho_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
-  sys_thread_new("tcpecho_MyThread", tcpecho_thread1, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
 }
 /*-----------------------------------------------------------------------------------*/
 
